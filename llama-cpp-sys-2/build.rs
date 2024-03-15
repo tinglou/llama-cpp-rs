@@ -160,6 +160,8 @@ fn main() {
         .include("llama.cpp")
         .include("llama.cpp/common")
         .include("llama.cpp/examples/llava")
+        .include("llama.cpp/common")
+        .include("llama.cpp/examples/llava")
         .std("c++11")
         .file("llama.cpp/llama.cpp")
         .file("llama.cpp/unicode.cpp")
