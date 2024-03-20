@@ -15,6 +15,7 @@ use llama_cpp_2::llava::{
     llava_sample, LlamaSamplingContext, LlamaSamplingParams, LlavaImageEmbed,
 };
 use llama_cpp_2::model::AddBos;
+use llama_cpp_2::ollama::get_model_manifest;
 use llama_cpp_2::token::LlamaToken;
 use llama_cpp_2::{
     context::LlamaContext,
