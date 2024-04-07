@@ -60,11 +60,11 @@ mod tests {
             "rootfs": {
                 "type": "layers",
                 "diff_ids": [
-                    "sha256:170370233dd5c5415250a2ecd5c71586352850729062ccef1496385647293868",
-                    "sha256:72d6f08a42f656d36b356dbe0920675899a99ce21192fd66266fb7d82ed07539",
-                    "sha256:43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
-                    "sha256:c43332387573e98fdfad4a606171279955b53d891ba2500552c2984a6560ffb4",
-                    "sha256:ed11eda7790d05b49395598a42b155812b17e263214292f7b87d15e14003d337"
+                    "sha256-170370233dd5c5415250a2ecd5c71586352850729062ccef1496385647293868",
+                    "sha256-72d6f08a42f656d36b356dbe0920675899a99ce21192fd66266fb7d82ed07539",
+                    "sha256-43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+                    "sha256-c43332387573e98fdfad4a606171279955b53d891ba2500552c2984a6560ffb4",
+                    "sha256-ed11eda7790d05b49395598a42b155812b17e263214292f7b87d15e14003d337"
                 ]
             }
         }
@@ -82,15 +82,15 @@ mod tests {
             rootfs: RootFs {
                 type_: "layers".to_string(),
                 diff_ids: vec![
-                    "sha256:170370233dd5c5415250a2ecd5c71586352850729062ccef1496385647293868"
+                    "sha256-170370233dd5c5415250a2ecd5c71586352850729062ccef1496385647293868"
                         .to_string(),
-                    "sha256:72d6f08a42f656d36b356dbe0920675899a99ce21192fd66266fb7d82ed07539"
+                    "sha256-72d6f08a42f656d36b356dbe0920675899a99ce21192fd66266fb7d82ed07539"
                         .to_string(),
-                    "sha256:43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1"
+                    "sha256-43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1"
                         .to_string(),
-                    "sha256:c43332387573e98fdfad4a606171279955b53d891ba2500552c2984a6560ffb4"
+                    "sha256-c43332387573e98fdfad4a606171279955b53d891ba2500552c2984a6560ffb4"
                         .to_string(),
-                    "sha256:ed11eda7790d05b49395598a42b155812b17e263214292f7b87d15e14003d337"
+                    "sha256-ed11eda7790d05b49395598a42b155812b17e263214292f7b87d15e14003d337"
                         .to_string(),
                 ],
             },
