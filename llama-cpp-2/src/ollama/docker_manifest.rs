@@ -79,10 +79,16 @@ pub struct Layer {
 impl Layer {
     /// get path
     pub fn get_path(&self) -> Result<PathBuf, OllamaError> {
+        // if digest containds ':', replace it with '-'
+        let digest = if self.digest.contains(":") {
+            self.digest.replace(":", "-")
+        } else {
+            self.digest.clone()
+        };
         let path = dirs::home_dir()
             .ok_or(OllamaError::HomeDirNotFound)?
             .join(OLLAMA_BLOBS)
-            .join(&self.digest);
+            .join(digest);
 
         Ok(path)
     }
