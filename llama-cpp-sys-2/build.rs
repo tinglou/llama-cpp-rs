@@ -92,6 +92,11 @@ fn compile_bindings(
 ) -> Result<(), Box<dyn std::error::Error + 'static>> {
     println!("Generating bindings..");
 
+    let includes = [
+        llama_header_path.join("ggml").join("include"),
+    ];
+    
+
     let includes = [llama_header_path.join("ggml").join("include")];
 
     let bindings = bindgen::Builder::default()
@@ -102,11 +107,30 @@ fn compile_bindings(
                 .join("llama.h")
                 .to_string_lossy(),
         )
+        .header(
+            LLAMA_PATH
+                .join("examples")
+                .join("llava")
+                .join("clip.h")
+                .to_string_lossy(),
+        )
+        .header(
+            LLAMA_PATH
+                .join("examples")
+                .join("llava")
+                .join("llava.h")
+                .to_string_lossy(),
+        )
+        .header("src/llava_sampling.h")
         .derive_partialeq(true)
         .allowlist_function("ggml_.*")
         .allowlist_type("ggml_.*")
         .allowlist_function("llama_.*")
         .allowlist_type("llama_.*")
+        .allowlist_function("llava_.*")
+        .allowlist_type("llava_.*")
+        .allowlist_function("clip_.*")
+        .allowlist_type("clip_.*")
         .prepend_enum_name(false);
 
     #[cfg(all(
@@ -424,6 +448,7 @@ fn compile_cuda(cx: &mut Build, cxx: &mut Build, featless_cxx: Build) -> &'stati
     // }
 
     for lib in ["cuda", "cublas", "cudart", "cublasLt"] {
+    for lib in ["cuda", "cublas", "cudart", "cublasLt"] {
         println!("cargo:rustc-link-lib={}", lib);
     }
     if !nvcc.get_compiler().is_like_msvc() {
@@ -738,6 +763,28 @@ fn compile_llama(mut cxx: Build, _out_path: impl AsRef<Path>) {
         .compile("llama");
 }
 
+fn compile_llava(mut cxx: Build) {
+    println!("Compiling Llama.cpp..");
+    let llama_include = LLAMA_PATH.join("include");
+    let ggml_include = LLAMA_PATH.join("ggml").join("include");
+    let common_dir = LLAMA_PATH.join("common");
+    let llava_dir = LLAMA_PATH.join("examples").join("llava");
+    cxx.std("c++11")
+        .include(llava_dir.clone())
+        .include(common_dir.clone())
+        .include(llama_include)
+        .include(ggml_include)
+        .file(llava_dir.join("llava.cpp"))
+        .file(llava_dir.join("clip.cpp"))
+        .file("src/llava_sampling.cpp")
+        .file("src/build-info.cpp")
+        .file(common_dir.join("sampling.cpp"))
+        .file(common_dir.join("grammar-parser.cpp"))
+        .file(common_dir.join("json-schema-to-grammar.cpp"))
+        .file(common_dir.join("common.cpp"))
+        .compile("llava");
+}
+
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").expect("No out dir found"));
 
@@ -801,6 +848,8 @@ fn main() {
     };
 
     compile_ggml(cx);
+    let llava_cxx = cxx.clone();
+    compile_llava(llava_cxx);
     compile_llama(cxx, &out_path);
 
     #[cfg(all(
