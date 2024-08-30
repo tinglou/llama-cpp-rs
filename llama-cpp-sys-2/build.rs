@@ -91,7 +91,7 @@ fn compile_bindings(
     llama_header_path: &Path,
 ) -> Result<(), Box<dyn std::error::Error + 'static>> {
     println!("Generating bindings..");
-    
+
     let includes = [
         llama_header_path.join("ggml").join("include"),
     ];
@@ -104,11 +104,30 @@ fn compile_bindings(
                 .join("llama.h")
                 .to_string_lossy(),
         )
+        .header(
+            LLAMA_PATH
+                .join("examples")
+                .join("llava")
+                .join("clip.h")
+                .to_string_lossy(),
+        )
+        .header(
+            LLAMA_PATH
+                .join("examples")
+                .join("llava")
+                .join("llava.h")
+                .to_string_lossy(),
+        )
+        .header("src/llava_sampling.h")
         .derive_partialeq(true)
         .allowlist_function("ggml_.*")
         .allowlist_type("ggml_.*")
         .allowlist_function("llama_.*")
         .allowlist_type("llama_.*")
+        .allowlist_function("llava_.*")
+        .allowlist_type("llava_.*")
+        .allowlist_function("clip_.*")
+        .allowlist_type("clip_.*")
         .prepend_enum_name(false);
 
     #[cfg(all(
@@ -425,9 +444,7 @@ fn compile_cuda(cx: &mut Build, cxx: &mut Build, featless_cxx: Build) -> &'stati
     //     nvcc.flag("-Wno-pedantic");
     // }
 
-    for lib in [
-        "cuda", "cublas", "cudart", "cublasLt"
-    ] {
+    for lib in ["cuda", "cublas", "cudart", "cublasLt"] {
         println!("cargo:rustc-link-lib={}", lib);
     }
     if !nvcc.get_compiler().is_like_msvc() {
@@ -623,31 +640,44 @@ fn gen_vulkan_shaders(out_path: impl AsRef<Path>) -> (impl AsRef<Path>, impl AsR
         .cpp(true)
         .get_compiler();
 
-    assert!(!cxx.is_like_msvc(), "Compiling Vulkan GGML with MSVC is not supported at this time.");
+    assert!(
+        !cxx.is_like_msvc(),
+        "Compiling Vulkan GGML with MSVC is not supported at this time."
+    );
 
     let vulkan_shaders_gen_bin = out_path.as_ref().join("vulkan-shaders-gen");
 
     cxx.to_command()
         .args([
-            vulkan_shaders_src.join("vulkan-shaders-gen.cpp").as_os_str(),
-            "-o".as_ref(), vulkan_shaders_gen_bin.as_os_str()
+            vulkan_shaders_src
+                .join("vulkan-shaders-gen.cpp")
+                .as_os_str(),
+            "-o".as_ref(),
+            vulkan_shaders_gen_bin.as_os_str(),
         ])
-        .output().expect("Could not compile Vulkan shader generator");
+        .output()
+        .expect("Could not compile Vulkan shader generator");
 
     let header = out_path.as_ref().join("ggml-vulkan-shaders.hpp");
     let source = out_path.as_ref().join("ggml-vulkan-shaders.cpp");
 
     Command::new(vulkan_shaders_gen_bin)
         .args([
-            "--glslc".as_ref(), "glslc".as_ref(),
-            "--input-dir".as_ref(), vulkan_shaders_src.as_os_str(),
-            "--output-dir".as_ref(), out_path.as_ref().join("vulkan-shaders.spv").as_os_str(),
-            "--target-hpp".as_ref(), header.as_os_str(),
-            "--target-cpp".as_ref(), source.as_os_str(),
-            "--no-clean".as_ref()
+            "--glslc".as_ref(),
+            "glslc".as_ref(),
+            "--input-dir".as_ref(),
+            vulkan_shaders_src.as_os_str(),
+            "--output-dir".as_ref(),
+            out_path.as_ref().join("vulkan-shaders.spv").as_os_str(),
+            "--target-hpp".as_ref(),
+            header.as_os_str(),
+            "--target-cpp".as_ref(),
+            source.as_os_str(),
+            "--no-clean".as_ref(),
         ])
-        .output().expect("Could not run Vulkan shader generator");
-    
+        .output()
+        .expect("Could not run Vulkan shader generator");
+
     (out_path, source)
 }
 
@@ -729,6 +759,28 @@ fn compile_llama(mut cxx: Build, _out_path: impl AsRef<Path>) {
         .compile("llama");
 }
 
+fn compile_llava(mut cxx: Build) {
+    println!("Compiling Llama.cpp..");
+    let llama_include = LLAMA_PATH.join("include");
+    let ggml_include = LLAMA_PATH.join("ggml").join("include");
+    let common_dir = LLAMA_PATH.join("common");
+    let llava_dir = LLAMA_PATH.join("examples").join("llava");
+    cxx.std("c++11")
+        .include(llava_dir.clone())
+        .include(common_dir.clone())
+        .include(llama_include)
+        .include(ggml_include)
+        .file(llava_dir.join("llava.cpp"))
+        .file(llava_dir.join("clip.cpp"))
+        .file("src/llava_sampling.cpp")
+        .file("src/build-info.cpp")
+        .file(common_dir.join("sampling.cpp"))
+        .file(common_dir.join("grammar-parser.cpp"))
+        .file(common_dir.join("json-schema-to-grammar.cpp"))
+        .file(common_dir.join("common.cpp"))
+        .compile("llava");
+}
+
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").expect("No out dir found"));
 
@@ -792,6 +844,8 @@ fn main() {
     };
 
     compile_ggml(cx);
+    let llava_cxx = cxx.clone();
+    compile_llava(llava_cxx);
     compile_llama(cxx, &out_path);
 
     #[cfg(all(
