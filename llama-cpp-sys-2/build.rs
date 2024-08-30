@@ -183,6 +183,10 @@ fn push_common_flags(cx: &mut Build, cxx: &mut Build) {
     if !cfg!(debug_assertions) {
         cx.define("NDEBUG", None);
         cxx.define("NDEBUG", None);
+        cx.define("LOG_TARGET", "stderr").define("LOG_TEE_TARGET", "nullptr");
+        cxx.define("LOG_TARGET", "stderr").define("LOG_TEE_TARGET", "nullptr");
+        cx.opt_level(3).debug(false);
+        cxx.opt_level(3).debug(false);        
     } else {
         cx.define("GGML_DEBUG", "100");
         cxx.define("GGML_DEBUG", "100");
@@ -191,8 +195,8 @@ fn push_common_flags(cx: &mut Build, cxx: &mut Build) {
             cx.define("_GLIBCXX_ASSERTIONS", None);
             cxx.define("_GLIBCXX_ASSERTIONS", None);
         } else if cfg!(target_os = "windows") {
-            cx.define("_CRT_SECURE_NO_WARNINGS", None);
-            cxx.define("_CRT_SECURE_NO_WARNINGS", None);
+            cx.define("_CRT_SECURE_NO_WARNINGS", None).static_crt(true);
+            cxx.define("_CRT_SECURE_NO_WARNINGS", None).static_crt(true);
         }
     }
 
