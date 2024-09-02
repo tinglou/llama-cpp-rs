@@ -452,7 +452,6 @@ fn compile_cuda(cx: &mut Build, cxx: &mut Build, featless_cxx: Build) -> &'stati
     // }
 
     for lib in ["cuda", "cublas", "cudart", "cublasLt"] {
-    for lib in ["cuda", "cublas", "cudart", "cublasLt"] {
         println!("cargo:rustc-link-lib={}", lib);
     }
     if !nvcc.get_compiler().is_like_msvc() {
