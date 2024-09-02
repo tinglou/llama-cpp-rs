@@ -86,6 +86,8 @@ compile_error!("feature \"vulkan\" cannot be enabled alongside other GPU based f
 
 static LLAMA_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("./llama.cpp"));
 
+mod arch_flags;
+
 fn compile_bindings(
     out_path: &Path,
     llama_header_path: &Path,
