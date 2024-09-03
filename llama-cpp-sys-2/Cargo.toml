@@ -75,3 +75,11 @@ cuda_dmmv = []
 cuda_mmq = []
 openblas = []
 blis = []
+
+# Force specific features
+force_avx = []
+force_avx2 = []
+force_avx512f = []
+force_avx512bw = []
+force_avx512vbmi = []
+force_avx512vnni = []
