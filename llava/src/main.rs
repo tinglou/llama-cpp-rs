@@ -116,6 +116,8 @@ fn llava_init_context<'a>(
     // initialize the context
     let ctx_params = LlamaContextParams::default()
         .with_n_ctx(NonZeroU32::new(2048))
+        .with_n_threads(16)
+        .with_n_threads_batch(16)
         .with_seed(1234);
 
     let ctx_llama = model

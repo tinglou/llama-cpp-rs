@@ -28,6 +28,8 @@ const FORCE_ARCH: bool = cfg!(any(
 /// * If any feature `force_*` is set manually, then force to push the flags
 pub fn push_feature_flags(cx: &mut Build, cxx: &mut Build) {
     // TODO in llama.cpp's cmake (https://github.com/ggerganov/llama.cpp/blob/9ecdd12e95aee20d6dfaf5f5a0f0ce5ac1fb2747/CMakeLists.txt#L659), they include SIMD instructions manually, however it doesn't seem to be necessary for VS2022's MSVC, check when it is needed
+    // cx.flag("-openmp");
+    // cx.define("GGML_USE_OPENMP", None);
 
     if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
         if cfg!(feature = "native") && cfg!(target_os = "linux") {
