@@ -8,21 +8,16 @@ use std::{ffi::CString, pin::pin};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
-use llama_cpp_2::context::params::LlamaContextParams;
-use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::llava::{
-    llava_sample, LlamaSamplingContext, LlamaSamplingParams, LlavaImageEmbed,
-};
-use llama_cpp_2::model::AddBos;
-use llama_cpp_2::token::LlamaToken;
 use llama_cpp_2::{
-    context::LlamaContext,
+    context::{params::LlamaContextParams, LlamaContext},
     llama_backend::LlamaBackend,
-    llava::ClipCtx,
+    llama_batch::LlamaBatch,
+    llava::{llava_sample, ClipCtx, LlamaSamplingContext, LlamaSamplingParams, LlavaImageEmbed},
     model::{
         params::{kv_overrides::ParamOverrideValue, LlamaModelParams},
-        LlamaModel,
+        AddBos, LlamaModel,
     },
+    token::LlamaToken,
 };
 
 #[derive(Parser, Debug, Clone)]
