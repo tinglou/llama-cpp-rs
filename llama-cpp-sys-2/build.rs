@@ -86,7 +86,7 @@ compile_error!("feature \"vulkan\" cannot be enabled alongside other GPU based f
 
 static LLAMA_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("./llama.cpp"));
 
-mod arch_flags;
+mod cc_arch_flags;
 
 fn compile_bindings(
     out_path: &Path,
@@ -830,7 +830,7 @@ fn main() {
     let featless_cxx = cxx.clone(); // mostly used for CUDA
 
     push_warn_flags(&mut cx, &mut cxx);
-    push_feature_flags(&mut cx, &mut cxx);
+    cc_arch_flags::push_feature_flags(&mut cx, &mut cxx);
 
     #[allow(unused_variables)]
     let feat_lib = if cfg!(feature = "vulkan") {
