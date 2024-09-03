@@ -7,7 +7,7 @@
 //!     let llava_cxx = cxx.clone();
 //!     build_llava::compile_llava(llava_cxx);
 //! ```
-//! 
+//!
 
 use cc::Build;
 
@@ -72,14 +72,15 @@ pub fn push_feature_flags(cx: &mut Build, cxx: &mut Build) {
                     cx.flag("-mavx512vnni");
                     cxx.flag("-mavx512vnni");
                 }
-            }
-
-            if (!FORCE_ARCH && is_x86_feature_detected!("avx2")) || cfg!(feature = "force_avx2") {
+            } else if !cfg!(target_os = "macos")
+                && ((!FORCE_ARCH && is_x86_feature_detected!("avx2"))
+                    || cfg!(feature = "force_avx2"))
+            {
                 cx.flag("-mavx2");
                 cxx.flag("-mavx2");
-            }
-
-            if (!FORCE_ARCH && is_x86_feature_detected!("avx")) || cfg!(feature = "force_avx") {
+            } else if (!FORCE_ARCH && is_x86_feature_detected!("avx"))
+                || cfg!(feature = "force_avx")
+            {
                 cx.flag("-mavx");
                 cxx.flag("-mavx");
             }
@@ -117,7 +118,6 @@ pub fn push_feature_flags(cx: &mut Build, cxx: &mut Build) {
         }
     }
 }
-
 
 pub fn compile_llava(mut cxx: Build) {
     println!("Compiling Llama.cpp..");
