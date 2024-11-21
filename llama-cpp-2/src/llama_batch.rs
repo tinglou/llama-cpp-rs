@@ -168,7 +168,7 @@ impl LlamaBatch {
 
             crate::llama_batch::LlamaBatch {
                 allocated: 0,
-                initialized_logits: vec![0],
+                initialized_logits: vec![(tokens.len() - 1) as i32],
                 llama_batch: batch,
             }
         }
