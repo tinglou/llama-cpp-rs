@@ -9,6 +9,8 @@
 //! ```
 //!
 
+use std::path::PathBuf;
+
 use cc::Build;
 
 use crate::LLAMA_PATH;
@@ -125,20 +127,17 @@ pub fn compile_llava(mut cxx: Build) {
     println!("Compiling Llama.cpp..");
     let llama_include = LLAMA_PATH.join("include");
     let ggml_include = LLAMA_PATH.join("ggml").join("include");
-    let common_dir = LLAMA_PATH.join("common");
+    let patch_dir = PathBuf::from("./src"); // for log.h and common.h, must before common
+    let common_dir = LLAMA_PATH.join("common"); // for std_image.h
     let llava_dir = LLAMA_PATH.join("examples").join("llava");
     cxx.std("c++11")
         .include(llava_dir.clone())
+        .include(patch_dir.clone())
         .include(common_dir.clone())
         .include(llama_include)
         .include(ggml_include)
         .file(llava_dir.join("llava.cpp"))
         .file(llava_dir.join("clip.cpp"))
-        .file("src/llava_sampling.cpp")
         .file("src/build-info.cpp")
-        .file(common_dir.join("sampling.cpp"))
-        .file(common_dir.join("grammar-parser.cpp"))
-        .file(common_dir.join("json-schema-to-grammar.cpp"))
-        .file(common_dir.join("common.cpp"))
         .compile("llava");
 }

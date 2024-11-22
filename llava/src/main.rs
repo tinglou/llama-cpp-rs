@@ -8,11 +8,13 @@ use std::{ffi::CString, pin::pin};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
+use llama_cpp_2::model::Special;
+use llama_cpp_2::token::data_array::LlamaTokenDataArray;
 use llama_cpp_2::{
     context::{params::LlamaContextParams, LlamaContext},
     llama_backend::LlamaBackend,
     llama_batch::LlamaBatch,
-    llava::{llava_sample, ClipCtx, LlamaSamplingContext, LlamaSamplingParams, LlavaImageEmbed},
+    llava::{ClipCtx, LlavaImageEmbed},
     model::{
         params::{kv_overrides::ParamOverrideValue, LlamaModelParams},
         AddBos, LlamaModel,
@@ -165,7 +167,7 @@ fn process_prompt(
 
     // eval user prompt
     eprintln!("evaluating user prompt...");
-    eval_string(
+    let logit = eval_string(
         &mut ctx_llava.ctx_llama,
         &user_prompt,
         n_batch,
@@ -175,41 +177,64 @@ fn process_prompt(
 
     // generate the response
     eprintln!();
-    let params_sampling = LlamaSamplingParams::default()?;
-    let mut ctx_sampling = LlamaSamplingContext::init(&params_sampling)
-        .with_context(|| "failed to initialize sampling subsystem".to_string())?;
-    let mut response = "".to_owned();
     let max_tgt_len: c_int = 256;
+    generate(&mut ctx_llava.ctx_llama, n_past, logit, max_tgt_len)?;
 
-    for _i in 0..max_tgt_len {
-        let tmp = llava_sample(&mut ctx_sampling, &mut ctx_llava.ctx_llama, &mut n_past);
-        response.push_str(&tmp);
-        if tmp == "</s>" {
-            break;
-        }
-        if tmp.contains("###") {
-            // Yi-VL behavior
-            break;
-        }
-
-        print!("{}", tmp);
-        std::io::stdout().flush()?;
-
-        if response.contains("<|im_end|>") {
-            // Yi-34B llava-1.6 - for some reason those decode not as the correct token (tokenizer works)
-            break;
-        }
-        if response.contains("<|im_start|>") {
-            // Yi-34B llava-1.6
-            break;
-        }
-        if response.contains("USER:") {
-            // mistral llava-1.6
-            break;
-        }
-    }
     println!();
 
+    Ok(())
+}
+
+fn generate(
+    llama_ctx: &mut LlamaContext<'_>,
+    mut n_cur: i32,
+    logit: i32,
+    n_len: i32,
+) -> Result<(), anyhow::Error> {
+    let mut decoder = encoding_rs::UTF_8.new_decoder();
+    let mut first = true;
+    for _i in 0..n_len {
+        // sample the next token
+
+        let token_pos = if first {
+            first = false;
+            logit - 1
+        } else {
+            0
+        };
+
+        let candidates = llama_ctx.candidates_ith(token_pos);
+        let candidates_p = LlamaTokenDataArray::from_iter(candidates, false);
+
+        // sample the most likely token
+        let new_token_id = llama_ctx.sample_token_greedy(candidates_p);
+
+        // is it an end of stream?
+        if new_token_id == llama_ctx.model.token_eos() {
+            eprintln!();
+            break;
+        }
+
+        let output_bytes = llama_ctx
+            .model
+            .token_to_bytes(new_token_id, Special::Tokenize)?;
+        // use `Decoder.decode_to_string()` to avoid the intermediate buffer
+        let mut output_string = String::with_capacity(32);
+        let _decode_result = decoder.decode_to_string(&output_bytes, &mut output_string, false);
+        print!("{output_string}");
+        std::io::stdout().flush()?;
+
+        let mut batch = LlamaBatch::get_one(&[new_token_id], n_cur, 0);
+        // batch.clear();
+        // batch.add(new_token_id, n_cur, &[0], true)?;
+
+        llama_ctx
+            .decode(&mut batch)
+            .with_context(|| "failed to eval")?;
+
+        n_cur += 1;
+        // n_decode += 1;
+    }
     Ok(())
 }
 
@@ -219,7 +244,7 @@ fn eval_string(
     n_batch: i32,
     n_past: &mut i32,
     add_bos: AddBos,
-) -> Result<bool> {
+) -> Result<i32> {
     let embd_inp = ctx_llama.model.str_to_token(str, add_bos)?;
 
     eval_token(ctx_llama, &embd_inp, n_batch, n_past)
@@ -230,11 +255,12 @@ fn eval_token(
     tokens: &[LlamaToken],
     n_batch: c_int,
     n_past: &mut i32,
-) -> Result<bool> {
+) -> Result<i32> {
     let n = tokens.len() as c_int;
     let mut i: c_int = 0;
+    let mut n_eval = 0;
     while i < n {
-        let mut n_eval = (tokens.len() as c_int) - i;
+        n_eval = (tokens.len() as c_int) - i;
         if n_eval > n_batch {
             n_eval = n_batch;
         }
@@ -252,7 +278,7 @@ fn eval_token(
         i += n_batch;
     }
 
-    Ok(true)
+    Ok(n_eval)
 }
 
 fn main() -> Result<()> {

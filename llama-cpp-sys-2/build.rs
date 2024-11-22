@@ -118,7 +118,6 @@ fn compile_bindings(
                 .join("llava.h")
                 .to_string_lossy(),
         )
-        .header("src/llava_sampling.h")
         .derive_partialeq(true)
         .allowlist_function("ggml_.*")
         .allowlist_type("ggml_.*")
