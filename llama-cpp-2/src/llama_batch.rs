@@ -189,9 +189,10 @@ impl Drop for LlamaBatch {
     /// # }
     fn drop(&mut self) {
         unsafe {
-            if self.allocated > 0 {
-                llama_batch_free(self.llama_batch);
+            if self.allocated == 0 {
+                self.llama_batch.token = std::ptr::null_mut();
             }
+            llama_batch_free(self.llama_batch);
         }
     }
 }
