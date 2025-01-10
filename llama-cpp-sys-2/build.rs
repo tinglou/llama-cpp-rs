@@ -4,6 +4,8 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod build_mm;
+
 macro_rules! debug_log {
     ($($arg:tt)*) => {
         if std::env::var("BUILD_DEBUG").is_ok() {
@@ -47,44 +49,6 @@ fn copy_folder(src: &Path, dst: &Path) {
             .status()
             .expect("Failed to execute robocopy command");
     }
-}
-
-fn install_llava(out_dir: &Path, build_shared_libs: bool) {
-    const FILE_STEM_SHARED: &str = "llava_shared";
-    const FILE_STEM_STATIC: &str = "llava_static";
-
-    let lib_dir = out_dir.join("lib");
-    let build_dir = out_dir.join("build/examples/llava/Release");
-    if cfg!(windows) {
-        if build_shared_libs {
-            let src = build_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
-            let dst = lib_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
-            std::fs::copy(src, dst).unwrap();
-        }
-        let src = build_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
-        let dst = lib_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
-        std::fs::copy(src, dst).unwrap();
-    } else if cfg!(target_os = "macos") {
-        if build_shared_libs {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".dylib"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".dylib"));
-            std::fs::copy(src, dst).unwrap();
-        } else {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            std::fs::copy(src, dst).unwrap();
-        }
-    } else {
-        if build_shared_libs {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".so"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".so"));
-            std::fs::copy(src, dst).unwrap();
-        } else {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            std::fs::copy(src, dst).unwrap();
-        }
-    };
 }
 
 fn extract_lib_names(out_dir: &Path, build_shared_libs: bool) -> Vec<String> {
@@ -319,14 +283,13 @@ fn main() {
         .very_verbose(std::env::var("CMAKE_VERBOSE").is_ok()) // Not verbose by default
         .always_configure(false);
 
-    config.define("LLAMA_BUILD_COMMON", "ON");
-    config.define("LLAMA_BUILD_EXAMPLES", "ON");
+    build_mm::pre_cmake_build(&mut config).unwrap();
 
     let build_dir = config.build();
     debug_log!("cmake build dir: {}", build_dir.display());
 
     // Install llava libs
-    install_llava(&out_dir, build_shared_libs);
+    build_mm::post_cmake_build(&out_dir, build_shared_libs).unwrap();
 
     // Search paths
     println!("cargo:rustc-link-search={}", out_dir.join("lib").display());

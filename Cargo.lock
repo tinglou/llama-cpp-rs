@@ -666,6 +666,7 @@ dependencies = [
 name = "llama-cpp-sys-2"
 version = "0.1.87"
 dependencies = [
+ "anyhow",
  "bindgen",
  "cc",
  "cmake",
