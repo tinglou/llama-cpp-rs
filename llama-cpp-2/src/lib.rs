@@ -25,6 +25,7 @@ use std::string::FromUtf8Error;
 pub mod context;
 pub mod llama_backend;
 pub mod llama_batch;
+pub mod llava;
 pub mod model;
 pub mod sampling;
 pub mod timing;
