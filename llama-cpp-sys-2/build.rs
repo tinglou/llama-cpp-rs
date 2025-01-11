@@ -286,7 +286,6 @@ fn main() {
     build_mm::pre_cmake_build(&mut config).unwrap();
 
     let build_dir = config.build();
-    debug_log!("cmake build dir: {}", build_dir.display());
 
     // Install llava libs
     build_mm::post_cmake_build(&out_dir, build_shared_libs).unwrap();
