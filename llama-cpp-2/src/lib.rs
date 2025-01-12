@@ -25,12 +25,13 @@ use std::string::FromUtf8Error;
 pub mod context;
 pub mod llama_backend;
 pub mod llama_batch;
-pub mod llava;
+pub mod llava3;
 pub mod model;
 pub mod sampling;
 pub mod timing;
 pub mod token;
 pub mod token_type;
+mod z_extension;
 
 /// A failable result from a llama.cpp function.
 pub type Result<T> = std::result::Result<T, LLamaCppError>;

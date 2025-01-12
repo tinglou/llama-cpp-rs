@@ -6,8 +6,8 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::{context::LlamaContext, LlamaModelLoadError};
 use super::ClipCtx;
+use crate::{context::LlamaContext, LlamaModelLoadError};
 
 /// A safe wrapper around `llava_image_embed`.
 #[derive(Debug)]

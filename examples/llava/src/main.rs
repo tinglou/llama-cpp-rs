@@ -14,7 +14,7 @@ use llama_cpp_2::{
     context::{params::LlamaContextParams, LlamaContext},
     llama_backend::LlamaBackend,
     llama_batch::LlamaBatch,
-    llava::{ClipCtx, LlavaImageEmbed},
+    llava3::{ClipCtx, LlavaImageEmbed},
     model::{
         params::{kv_overrides::ParamOverrideValue, LlamaModelParams},
         AddBos, LlamaModel,
@@ -119,8 +119,7 @@ fn llava_init_context<'a>(
     let ctx_params = LlamaContextParams::default()
         .with_n_ctx(NonZeroU32::new(2048))
         .with_n_threads(16)
-        .with_n_threads_batch(16)
-        ;
+        .with_n_threads_batch(16);
 
     let ctx_llama = model
         .new_context(&backend, ctx_params)
@@ -193,10 +192,8 @@ fn generate(
 ) -> Result<(), anyhow::Error> {
     let mut decoder = encoding_rs::UTF_8.new_decoder();
 
-    let mut sampler = LlamaSampler::chain_simple([
-        LlamaSampler::dist(1234),
-        LlamaSampler::greedy(),
-    ]);
+    let mut sampler =
+        LlamaSampler::chain_simple([LlamaSampler::dist(1234), LlamaSampler::greedy()]);
 
     let mut first = true;
     for _i in 0..n_len {
