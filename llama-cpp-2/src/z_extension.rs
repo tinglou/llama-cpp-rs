@@ -15,6 +15,7 @@ impl<'model> LlamaContext<'model> {
     }
 }
 
+/// extend LlamaModel
 impl LlamaModel {
     /// return raw const pointer
     pub fn as_ptr(&self) -> *const llama_cpp_sys_2::llama_model {
@@ -27,6 +28,7 @@ impl LlamaModel {
     }
 }
 
+/// extend LlamaSampler
 impl LlamaSampler {
     /// return raw const pointer
     pub fn as_ptr(&self) -> *const llama_cpp_sys_2::llama_sampler {
