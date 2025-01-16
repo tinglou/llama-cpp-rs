@@ -73,3 +73,6 @@ dynamic-link = []
 vulkan = []
 native = []
 openmp = []
+
+sycl-f16 = ["dynamic-link"] # faster
+sycl-f32 = ["dynamic-link"] # better quality

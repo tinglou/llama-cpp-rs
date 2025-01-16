@@ -26,7 +26,8 @@ vulkan = ["llama-cpp-sys-2/vulkan"]
 native = ["llama-cpp-sys-2/native"]
 openmp = ["llama-cpp-sys-2/openmp"]
 sampler = []
-
+sycl-f16 = ["llama-cpp-sys-2/sycl-f16"] # faster
+sycl-f32 = ["llama-cpp-sys-2/sycl-f32"] # better quality
 
 [target.'cfg(all(target_os = "macos", any(target_arch = "aarch64", target_arch = "arm64")))'.dependencies]
 llama-cpp-sys-2 = { path = "../llama-cpp-sys-2", version = "0.1.69", features = [

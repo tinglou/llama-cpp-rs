@@ -221,7 +221,7 @@ fn main() {
     // be included in what's uploaded to and downloaded from
     // crates.io, so deactivating these instead
     config.define("LLAMA_BUILD_TESTS", "OFF");
-    config.define("LLAMA_BUILD_EXAMPLES", "OFF");
+    // config.define("LLAMA_BUILD_EXAMPLES", "OFF");
     config.define("LLAMA_BUILD_SERVER", "OFF");
 
     config.define(
