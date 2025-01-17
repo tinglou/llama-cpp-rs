@@ -11,7 +11,6 @@ macro_rules! debug_log {
     };
 }
 
-
 pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     let target = env::var("TARGET")?;
     // let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -81,6 +80,31 @@ pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Resu
     Ok(())
 }
 
+/// check if src file is newer than dst file, if yes, hard link src to dst
+fn safe_hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> anyhow::Result<()> {
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+    let src_metadata = std::fs::metadata(src);
+    let dst_metadata = std::fs::metadata(dst);
+
+    match (src_metadata, dst_metadata) {
+        (Ok(src_md), Ok(dst_md)) => {
+            // 可以根据需要添加更多的元数据检查
+            if src_md.len() != dst_md.len() || src_md.modified()? != dst_md.modified()? {
+                std::fs::remove_file(dst)?;
+                std::fs::hard_link(src, dst)?;
+            }
+        }
+        (Ok(_), Err(_)) => {
+            std::fs::hard_link(src, dst)?;
+        }
+        (Err(_), _) => {
+            anyhow::bail!("src file not found");
+        }
+    }
+    Ok(())
+}
+
 /// Copy sycl libs to out_dir
 /// works only on windows with oneAPI 2025.0
 fn copy_sycl_libs(_out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow::Error> {
@@ -106,19 +130,21 @@ fn copy_sycl_libs(_out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
     ];
 
     let target_dir = crate::get_cargo_target_dir().unwrap();
-    
+
     for lib in libs {
         let src = Path::new(lib);
         let target = target_dir.join(src.file_name().unwrap());
         std::fs::copy(src, &target)
             .with_context(|| format!("Failed to copy lib file {} to target", src.display()))?;
         let examples = target_dir.join("examples").join(src.file_name().unwrap());
-        std::fs::hard_link(&target, examples).with_context(|| format!("Failed to copy lib file {} to examples", target.display()))?;
+        safe_hard_link(&target, &examples)
+            .with_context(|| format!("Failed to copy lib file {} to examples", target.display()))?;
         let deps = target_dir.join("deps").join(src.file_name().unwrap());
-        std::fs::hard_link(&target, deps).with_context(|| format!("Failed to copy lib file {} to deps", target.display()))?;
+        safe_hard_link(&target, &deps)
+            .with_context(|| format!("Failed to copy lib file {} to deps", target.display()))?;
 
         // link oneAPI libs
-        if !build_shared_libs{
+        if !build_shared_libs {
             let stem = src.file_stem().unwrap();
             let stem_str = stem.to_str().unwrap();
 
@@ -131,8 +157,6 @@ fn copy_sycl_libs(_out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
             println!("cargo:rustc-link-lib=dylib={}", lib_name);
         }
     }
-
-
 
     Ok(())
 }
@@ -147,35 +171,35 @@ fn copy_llava_libs(out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
         if build_shared_libs {
             let src = build_dir.join(format!("Release/{}{}", FILE_STEM_SHARED, ".dll"));
             let dst = lib_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
-            std::fs::hard_link(&src, &dst)
+            safe_hard_link(&src, &dst)
                 .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
         }
         let src = build_dir.join(format!("Release/{}{}", FILE_STEM_STATIC, ".lib"));
         let dst = lib_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
-        std::fs::hard_link(&src, &dst)
+        safe_hard_link(&src, &dst)
             .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
     } else if cfg!(target_os = "macos") {
         if build_shared_libs {
             let src = build_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".dylib"));
             let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".dylib"));
-            std::fs::hard_link(&src, &dst)
+            safe_hard_link(&src, &dst)
                 .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
         } else {
             let src = build_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
             let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            std::fs::hard_link(&src, &dst)
+            safe_hard_link(&src, &dst)
                 .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
         }
     } else {
         if build_shared_libs {
             let src = build_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".so"));
             let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".so"));
-            std::fs::hard_link(&src, &dst)
+            safe_hard_link(&src, &dst)
                 .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
         } else {
             let src = build_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
             let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            std::fs::hard_link(&src, &dst)
+            safe_hard_link(&src, &dst)
                 .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
         }
     };
