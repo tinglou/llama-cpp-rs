@@ -1,4 +1,5 @@
 use crate::context::LlamaContext;
+use crate::model::params::LlamaModelParams;
 use crate::model::LlamaModel;
 use crate::sampling::LlamaSampler;
 
@@ -39,4 +40,17 @@ impl LlamaSampler {
     pub fn as_mut(&mut self) -> *mut llama_cpp_sys_2::llama_sampler {
         self.sampler
     }
+}
+
+impl LlamaModelParams {
+    /// return raw const pointer
+    pub fn as_ptr(&self) -> *const llama_cpp_sys_2::llama_model_params {
+        &self.params
+    }
+
+    /// return raw mut pointer
+    pub fn as_mut(&mut self) -> *mut llama_cpp_sys_2::llama_model_params {
+        &mut self.params
+    }    
+    
 }
