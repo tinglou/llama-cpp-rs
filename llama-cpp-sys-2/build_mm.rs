@@ -17,10 +17,9 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     // let build_dir = out_dir.join("llama.cpp");
     // config.out_dir(build_dir);
 
-    debug_log!("target: {target}");
-
     if !cfg!(debug_assertions) {
         // release
+        debug_log!("build type: release");
         config.define("NDEBUG", "1");
         config.define("LLAVA_LOG_OFF", "1");
     }
