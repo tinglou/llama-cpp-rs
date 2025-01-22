@@ -19,6 +19,12 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
 
     debug_log!("target: {target}");
 
+    if !cfg!(debug_assertions) {
+        // release
+        config.define("NDEBUG", "1");
+        config.define("LLAVA_LOG_OFF", "1");
+    }
+
     // 1. turn on examples to enable llava
     config.define("LLAMA_BUILD_COMMON", "ON");
     config.define("LLAMA_BUILD_EXAMPLES", "ON");
