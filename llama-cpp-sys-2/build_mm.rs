@@ -17,11 +17,13 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     // let build_dir = out_dir.join("llama.cpp");
     // config.out_dir(build_dir);
 
-    if !cfg!(debug_assertions) {
+    if cfg!(windows) && !cfg!(debug_assertions) {
         // release
-        debug_log!("build type: release");
-        config.define("NDEBUG", "1");
-        config.define("LLAVA_LOG_OFF", "1");
+        debug_log!("disabe log in release mode");
+        config.cflag("/D NDEBUG");
+        config.cflag("/D LLAVA_LOG_OFF");
+        config.cxxflag("/D NDEBUG");
+        config.cxxflag("/D LLAVA_LOG_OFF");
     }
 
     // 1. turn on examples to enable llava
