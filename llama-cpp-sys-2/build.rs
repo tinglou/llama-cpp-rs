@@ -3,6 +3,7 @@ use glob::glob;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use walkdir::DirEntry;
 
 mod build_mm;
 
@@ -14,41 +15,14 @@ macro_rules! debug_log {
     };
 }
 
-fn get_cargo_target_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR")?);
-    let profile = std::env::var("PROFILE")?;
-    let mut target_dir = None;
-    let mut sub_path = out_dir.as_path();
-    while let Some(parent) = sub_path.parent() {
-        if parent.ends_with(&profile) {
-            target_dir = Some(parent);
-            break;
-        }
-        sub_path = parent;
-    }
-    let target_dir = target_dir.ok_or("not found")?;
+fn get_cargo_target_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let out_dir = env::var("OUT_DIR")?;
+    let path = PathBuf::from(out_dir);
+    let target_dir = path
+        .ancestors()
+        .nth(3)
+        .ok_or("OUT_DIR is not deep enough")?;
     Ok(target_dir.to_path_buf())
-}
-
-fn copy_folder(src: &Path, dst: &Path) {
-    std::fs::create_dir_all(dst).expect("Failed to create dst directory");
-    if cfg!(unix) {
-        std::process::Command::new("cp")
-            .arg("-rf")
-            .arg(src)
-            .arg(dst.parent().unwrap())
-            .status()
-            .expect("Failed to execute cp command");
-    }
-
-    if cfg!(windows) {
-        std::process::Command::new("robocopy.exe")
-            .arg("/e")
-            .arg(src)
-            .arg(dst)
-            .status()
-            .expect("Failed to execute robocopy command");
-    }
 }
 
 fn extract_lib_names(out_dir: &Path, build_shared_libs: bool) -> Vec<String> {
@@ -60,12 +34,10 @@ fn extract_lib_names(out_dir: &Path, build_shared_libs: bool) -> Vec<String> {
         } else {
             "*.a"
         }
+    } else if build_shared_libs {
+        "*.so"
     } else {
-        if build_shared_libs {
-            "*.so"
-        } else {
-            "*.a"
-        }
+        "*.a"
     };
     let libs_dir = out_dir.join("lib*");
     let pattern = libs_dir.join(lib_pattern);
@@ -84,6 +56,13 @@ fn extract_lib_names(out_dir: &Path, build_shared_libs: bool) -> Vec<String> {
                 let lib_name = if stem_str.starts_with("lib") {
                     stem_str.strip_prefix("lib").unwrap_or(stem_str)
                 } else {
+                    if path.extension() == Some(std::ffi::OsStr::new("a")) {
+                        // panic!("renaming {:?} to {:?}", &path, path.join(format!("lib{}.a", stem_str)));
+                        let target = path.parent().unwrap().join(format!("lib{}.a", stem_str));
+                        std::fs::rename(&path, &target).unwrap_or_else(|e| {
+                            panic!("Failed to rename {path:?} to {target:?}: {e:?}");
+                        })
+                    }
                     stem_str
                 };
                 lib_names.push(lib_name.to_string());
@@ -145,12 +124,20 @@ fn macos_link_search_path() -> Option<String> {
     None
 }
 
+fn is_hidden(e: &DirEntry) -> bool {
+    e.file_name()
+        .to_str()
+        .map(|s| s.starts_with('.'))
+        .unwrap_or_default()
+}
+
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+
     let target = env::var("TARGET").unwrap();
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let target_dir = get_cargo_target_dir().unwrap();
-    let llama_dst = out_dir.join("llama.cpp");
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let llama_src = Path::new(&manifest_dir).join("llama.cpp");
     let build_shared_libs = cfg!(feature = "cuda") || cfg!(feature = "dynamic-link");
@@ -163,17 +150,40 @@ fn main() {
         .map(|v| v == "1")
         .unwrap_or(false);
 
+    println!("cargo:rerun-if-env-changed=LLAMA_LIB_PROFILE");
+    println!("cargo:rerun-if-env-changed=LLAMA_BUILD_SHARED_LIBS");
+    println!("cargo:rerun-if-env-changed=LLAMA_STATIC_CRT");
+
     debug_log!("TARGET: {}", target);
     debug_log!("CARGO_MANIFEST_DIR: {}", manifest_dir);
     debug_log!("TARGET_DIR: {}", target_dir.display());
     debug_log!("OUT_DIR: {}", out_dir.display());
     debug_log!("BUILD_SHARED: {}", build_shared_libs);
 
-    // Prepare sherpa-onnx source
-    if !llama_dst.exists() {
-        debug_log!("Copy {} to {}", llama_src.display(), llama_dst.display());
-        copy_folder(&llama_src, &llama_dst);
+    // Make sure that changes to the llama.cpp project trigger a rebuild.
+    let rebuild_on_children_of = [
+        llama_src.join("src"),
+        llama_src.join("ggml/src"),
+        llama_src.join("common"),
+    ];
+    for entry in walkdir::WalkDir::new(&llama_src)
+        .into_iter()
+        .filter_entry(|e| !is_hidden(e))
+    {
+        let entry = entry.expect("Failed to obtain entry");
+        let rebuild = entry
+            .file_name()
+            .to_str()
+            .map(|f| f.starts_with("CMake"))
+            .unwrap_or_default()
+            || rebuild_on_children_of
+                .iter()
+                .any(|src_folder| entry.path().starts_with(src_folder));
+        if rebuild {
+            println!("cargo:rerun-if-changed={}", entry.path().display());
+        }
     }
+
     // Speed up build
     env::set_var(
         "CMAKE_BUILD_PARALLEL_LEVEL",
@@ -186,8 +196,8 @@ fn main() {
     // Bindings
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
-        .clang_arg(format!("-I{}", llama_dst.join("include").display()))
-        .clang_arg(format!("-I{}", llama_dst.join("ggml/include").display()))
+        .clang_arg(format!("-I{}", llama_src.join("include").display()))
+        .clang_arg(format!("-I{}", llama_src.join("ggml/include").display()))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .derive_partialeq(true)
         .allowlist_function("ggml_.*")
@@ -209,13 +219,12 @@ fn main() {
         .expect("Failed to write bindings");
 
     println!("cargo:rerun-if-changed=wrapper.h");
-    println!("cargo:rerun-if-changed=./sherpa-onnx");
 
     debug_log!("Bindings Created");
 
     // Build with Cmake
 
-    let mut config = Config::new(&llama_dst);
+    let mut config = Config::new(&llama_src);
 
     // Would require extra source files to pointlessly
     // be included in what's uploaded to and downloaded from
@@ -237,22 +246,44 @@ fn main() {
         config.static_crt(static_crt);
     }
 
-    if target.contains("android") && target.contains("aarch64") {
+    if target.contains("android") {
         // build flags for android taken from this doc
         // https://github.com/ggerganov/llama.cpp/blob/master/docs/android.md
         let android_ndk = env::var("ANDROID_NDK")
             .expect("Please install Android NDK and ensure that ANDROID_NDK env variable is set");
+
+        println!("cargo::rerun-if-env-changed=ANDROID_NDK");
+
         config.define(
             "CMAKE_TOOLCHAIN_FILE",
             format!("{android_ndk}/build/cmake/android.toolchain.cmake"),
         );
-        config.define("ANDROID_ABI", "arm64-v8a");
-        config.define("ANDROID_PLATFORM", "android-28");
-        config.define("CMAKE_SYSTEM_PROCESSOR", "arm64");
-        config.define("CMAKE_C_FLAGS", "-march=armv8.7a");
-        config.define("CMAKE_CXX_FLAGS", "-march=armv8.7a");
-        config.define("GGML_OPENMP", "OFF");
+        if env::var("ANDROID_PLATFORM").is_ok() {
+            println!("cargo::rerun-if-env-changed=ANDROID_PLATFORM");
+        } else {
+            config.define("ANDROID_PLATFORM", "android-28");
+        }
+        if target.contains("aarch64") {
+            config.cflag("-march=armv8.7a");
+            config.cxxflag("-march=armv8.7a");
+        } else if target.contains("armv7") {
+            config.cflag("-march=armv8.7a");
+            config.cxxflag("-march=armv8.7a");
+        } else if target.contains("x86_64") {
+            config.cflag("-march=x86-64");
+            config.cxxflag("-march=x86-64");
+        } else if target.contains("i686") {
+            config.cflag("-march=i686");
+            config.cxxflag("-march=i686");
+        } else {
+            // Rather than guessing just fail.
+            panic!("Unsupported Android target {target}");
+        }
         config.define("GGML_LLAMAFILE", "OFF");
+        if cfg!(feature = "shared-stdcxx") {
+            println!("cargo:rustc-link-lib=dylib=stdc++");
+            println!("cargo:rustc-link-lib=c++_shared");
+        }
     }
 
     if cfg!(feature = "vulkan") {
@@ -274,8 +305,13 @@ fn main() {
         config.define("GGML_CUDA", "ON");
     }
 
-    if cfg!(feature = "openmp") {
+    // Android doesn't have OpenMP support AFAICT and openmp is a default feature. Do this here
+    // rather than modifying the defaults in Cargo.toml just in case someone enables the OpenMP feature
+    // and tries to build for Android anyway.
+    if cfg!(feature = "openmp") && !target.contains("android") {
         config.define("GGML_OPENMP", "ON");
+    } else {
+        config.define("GGML_OPENMP", "OFF");
     }
 
     // General
@@ -305,21 +341,14 @@ fn main() {
     assert_ne!(llama_libs.len(), 0);
 
     for lib in llama_libs {
-        debug_log!(
-            "LINK {}",
-            format!("cargo:rustc-link-lib={}={}", llama_libs_kind, lib)
-        );
-        println!(
-            "{}",
-            format!("cargo:rustc-link-lib={}={}", llama_libs_kind, lib)
-        );
+        let link = format!("cargo:rustc-link-lib={}={}", llama_libs_kind, lib);
+        debug_log!("LINK {link}",);
+        println!("{link}",);
     }
 
     // OpenMP
-    if cfg!(feature = "openmp") {
-        if target.contains("gnu") {
-            println!("cargo:rustc-link-lib=gomp");
-        }
+    if cfg!(feature = "openmp") && target.contains("gnu") {
+        println!("cargo:rustc-link-lib=gomp");
     }
 
     // Windows debug
