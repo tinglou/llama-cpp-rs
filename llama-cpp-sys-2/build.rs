@@ -381,6 +381,10 @@ fn main() {
     build_mm::pre_cmake_build(&mut config).unwrap();
 
     let build_dir = config.build();
+
+    // Install llava libs
+    build_mm::post_cmake_build(&out_dir, build_shared_libs).unwrap();
+
     std::fs::rename(
         llama_src.join("common/build-info.cpp"),
         build_dir.join("build-info.cpp"),

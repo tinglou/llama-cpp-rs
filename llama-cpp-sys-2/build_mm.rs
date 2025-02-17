@@ -11,6 +11,10 @@ macro_rules! debug_log {
     };
 }
 
+/// pre cmake build, called before cmake build
+/// ```ignore
+/// let build_dir = config.build();
+/// ```
 pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     let target = env::var("TARGET")?;
     // let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -143,6 +147,10 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// post cmake build, called after cmake build
+/// ```ignore
+/// let build_dir = config.build();
+/// ```
 pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Result<()> {
     if cfg!(windows) && (cfg!(feature = "sycl-f16") || cfg!(feature = "sycl-f32")) {
         copy_sycl_libs(out_dir, build_shared_libs)?;
@@ -151,6 +159,7 @@ pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Resu
     }
     Ok(())
 }
+
 
 /// check if src file is newer than dst file, if yes, hard link src to dst
 fn safe_hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> anyhow::Result<()> {
