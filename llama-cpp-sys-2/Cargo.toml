@@ -88,6 +88,9 @@ native = []
 openmp = []
 sycl-f16 = ["dynamic-link"] # faster
 sycl-f32 = ["dynamic-link"] # better quality
+kompute = []
+rpc = []
+opencl = []
 # Only has an impact on Android.
 shared-stdcxx = []
 

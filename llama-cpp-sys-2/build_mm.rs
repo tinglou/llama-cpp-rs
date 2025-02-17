@@ -38,6 +38,18 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
         config.define("GGML_METAL_EMBED_LIBRARY", "OFF");
     }
 
+    if cfg!(feature = "kompute") {
+        config.define("GGML_KOMPUTE", "ON");
+    }
+
+    if cfg!(feature = "rpc") {
+        config.define("GGML_RPC", "ON");
+    }
+
+    if cfg!(feature = "opencl") {
+        config.define("GGML_OPENCL", "ON");
+    }
+
     // 3. turn on sycl on windows, see [sycl](llama-cpp-sys-2\\llama.cpp\\docs\\backend\\SYCL.md)
     if cfg!(windows) && (cfg!(feature = "sycl-f16") || cfg!(feature = "sycl-f32")) {
         // 只有编译 sycl 时，采用 Ninja
@@ -73,6 +85,59 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
         if cfg!(feature = "sycl-f16") {
             config.define("GGML_SYCL_F16", "ON");
         }
+    }
+
+    // 4. cpu features
+    if cfg!(feature = "ggml-cpu-hbm") {
+        config.define("GGML_CPU_HBM", "ON");
+    }
+    if cfg!(feature = "ggml-cpu-aarch64") {
+        config.define("GGML_CPU_AARCH64", "ON");
+    }
+    if cfg!(feature = "ggml-avx") {
+        config.define("GGML_AVX", "ON");
+    }
+    if cfg!(feature = "ggml-avx-vnni") {
+        config.define("GGML_AVX_VNNI", "ON");
+    }
+    if cfg!(feature = "ggml-avx2") {
+        config.define("GGML_AVX2", "ON");
+    }
+    if cfg!(feature = "ggml-avx512") {
+        config.define("GGML_AVX512", "ON");
+    }
+    if cfg!(feature = "ggml-avx512-vbmi") {
+        config.define("GGML_AVX512_VBMI", "ON");
+    }
+    if cfg!(feature = "ggml-avx512-vnni") {
+        config.define("GGML_AVX512_VNNI", "ON");
+    }
+    if cfg!(feature = "ggml-avx512-bf16") {
+        config.define("GGML_AVX512_BF16", "ON");
+    }
+    if cfg!(feature = "ggml-fma") {
+        config.define("GGML_FMA", "ON");
+    }
+    if cfg!(feature = "ggml-f16c") {
+        config.define("GGML_F16C", "ON");
+    }
+    if cfg!(feature = "ggml-amx-tile") {
+        config.define("GGML_AMX_TILE", "ON");
+    }
+    if cfg!(feature = "ggml-amx-int8") {
+        config.define("GGML_AMX_INT8", "ON");
+    }
+    if cfg!(feature = "ggml-amx-bf16") {
+        config.define("GGML_AMX_BF16", "ON");
+    }
+    if cfg!(feature = "ggml-lasx") {
+        config.define("GGML_LASX", "ON");
+    }
+    if cfg!(feature = "ggml-lsx") {
+        config.define("GGML_LSX", "ON");
+    }
+    if cfg!(feature = "ggml-rvv") {
+        config.define("GGML_RVV", "ON");
     }
 
     Ok(())
@@ -125,7 +190,6 @@ fn copy_sycl_libs(_out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
         "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin\\ur_adapter_opencl.dll",
         "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin\\ur_adapter_level_zero.dll",
         "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin\\intelocl64.dll",
-        "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin\\onnxruntime.1.12.22.721.dll",
         "C:\\Program Files (x86)\\Intel\\oneAPI\\dnnl\\latest\\bin\\dnnl.dll",
         "C:\\Program Files (x86)\\Intel\\oneAPI\\mkl\\latest\\bin\\mkl_sycl_blas.5.dll",
         "C:\\Program Files (x86)\\Intel\\oneAPI\\mkl\\latest\\bin\\mkl_tbb_thread.2.dll",
