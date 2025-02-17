@@ -86,8 +86,27 @@ dynamic-link = []
 vulkan = []
 native = []
 openmp = []
-
 sycl-f16 = ["dynamic-link"] # faster
 sycl-f32 = ["dynamic-link"] # better quality
 # Only has an impact on Android.
 shared-stdcxx = []
+
+ggml-cpu-hbm = []
+ggml-cpu-aarch64 = []
+ggml-avx = []
+ggml-avx-vnni = []
+ggml-avx2 = []
+ggml-avx512 = []
+ggml-avx512-vbmi = []
+ggml-avx512-vnni = []
+ggml-avx512-bf16 = []
+# in MSVC F16C and FMA is implied with AVX2/AVX512
+ggml-fma = []
+ggml-f16c = []
+# MSVC does not seem to support AMX
+ggml-amx-tile = []
+ggml-amx-int8 = []
+ggml-amx-bf16 = []
+ggml-lasx = []
+ggml-lsx = []
+ggml-rvv = []
