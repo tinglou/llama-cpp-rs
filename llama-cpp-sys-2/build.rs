@@ -181,7 +181,7 @@ fn main() {
     let target_dir = get_cargo_target_dir().unwrap();
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let llama_src = Path::new(&manifest_dir).join("llama.cpp");
-    let build_shared_libs = cfg!(feature = "cuda") || cfg!(feature = "dynamic-link");
+    let build_shared_libs = cfg!(feature = "dynamic-link");
 
     let build_shared_libs = std::env::var("LLAMA_BUILD_SHARED_LIBS")
         .map(|v| v == "1")
@@ -283,10 +283,7 @@ fn main() {
         config.define("GGML_BLAS", "OFF");
     }
 
-    if (cfg!(debug_assertions)
-        || std::env::var("PROFILE").as_ref().map(String::as_str) == Ok("debug"))
-        && matches!(target_os, TargetOs::Windows(WindowsVariant::Msvc))
-        && profile == "Release"
+    if (matches!(target_os, TargetOs::Windows(WindowsVariant::Msvc)) && matches!(profile.as_str(), "Release" | "RelWithDebInfo" | "MinSizeRel"))
     {
         // Debug Rust builds under MSVC turn off optimization even though we're ideally building the release profile of llama.cpp.
         // Looks like an upstream bug:
@@ -361,6 +358,10 @@ fn main() {
 
     if cfg!(feature = "cuda") {
         config.define("GGML_CUDA", "ON");
+
+        if cfg!(feature = "cuda-no-vmm") {
+            config.define("GGML_CUDA_NO_VMM", "ON");
+        }
     }
 
     // Android doesn't have OpenMP support AFAICT and openmp is a default feature. Do this here
@@ -398,6 +399,31 @@ fn main() {
         out_dir.join("lib64").display()
     );
     println!("cargo:rustc-link-search={}", build_dir.display());
+
+    if cfg!(feature = "cuda") && !build_shared_libs {
+        println!("cargo:rerun-if-env-changed=CUDA_PATH");
+
+        for lib_dir in find_cuda_helper::find_cuda_lib_dirs() {
+            println!("cargo:rustc-link-search=native={}", lib_dir.display());
+        }
+
+        // Logic from ggml-cuda/CMakeLists.txt
+        println!("cargo:rustc-link-lib=static=cudart_static");
+        if matches!(target_os, TargetOs::Windows(_)) {
+            println!("cargo:rustc-link-lib=static=cublas");
+            println!("cargo:rustc-link-lib=static=cublasLt");
+        } else {
+            println!("cargo:rustc-link-lib=static=cublas_static");
+            println!("cargo:rustc-link-lib=static=cublasLt_static");
+        }
+
+        // Need to link against libcuda.so unless GGML_CUDA_NO_VMM is defined.
+        if !cfg!(feature = "cuda-no-vmm") {
+            println!("cargo:rustc-link-lib=cuda");
+        }
+
+        println!("cargo:rustc-link-lib=static=culibos");
+    }
 
     // Link libraries
     let llama_libs_kind = if build_shared_libs { "dylib" } else { "static" };

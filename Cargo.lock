@@ -277,7 +277,7 @@ checksum = "3dca9240753cf90908d7e4aac30f630662b02aebaa1b58a3cadabdb23385b58b"
 
 [[package]]
 name = "embeddings"
-version = "0.1.101"
+version = "0.1.103"
 dependencies = [
  "anyhow",
  "clap",
@@ -335,6 +335,15 @@ name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
+
+[[package]]
+name = "find_cuda_helper"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9f9e65c593dd01ac77daad909ea4ad17f0d6d1776193fc8ea766356177abdad"
+dependencies = [
+ "glob",
+]
 
 [[package]]
 name = "flate2"
@@ -653,7 +662,7 @@ checksum = "643cb0b8d4fcc284004d5fd0d67ccf61dfffadb7f75e1e71bc420f4688a3a704"
 
 [[package]]
 name = "llama-cpp-2"
-version = "0.1.101"
+version = "0.1.103"
 dependencies = [
  "encoding_rs",
  "enumflags2",
@@ -665,12 +674,13 @@ dependencies = [
 
 [[package]]
 name = "llama-cpp-sys-2"
-version = "0.1.101"
+version = "0.1.103"
 dependencies = [
  "anyhow",
  "bindgen",
  "cc",
  "cmake",
+ "find_cuda_helper",
  "glob",
  "walkdir",
 ]
@@ -1106,7 +1116,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "simple"
-version = "0.1.101"
+version = "0.1.103"
 dependencies = [
  "anyhow",
  "clap",
