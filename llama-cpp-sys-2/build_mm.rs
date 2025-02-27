@@ -24,12 +24,16 @@ pub fn cmake_build(config: &mut Config) -> PathBuf {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let build_dir = out_dir.join("build");
 
+    //  check if cmake cache exists
     let cmake_cache = build_dir.join("CMakeCache.txt");
     if cmake_cache.exists() {
         debug_log!("cmake cache exists, skip cmake build");
-        return build_dir;
+        // build_dir returned by `cmake::Congfig::build` is the same as oput_dir by default
+        out_dir
     } else {
-        return config.build();
+        let dir =  config.build();
+        debug_log!("build dir: {}", dir.display());
+        dir
     }
 }
 
@@ -37,6 +41,10 @@ pub fn cmake_build(config: &mut Config) -> PathBuf {
 /// build.rs:382
 pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     let target = env::var("TARGET")?;
+
+    if cfg!(windows) {
+        config.generator("Ninja");
+    }
 
     if cfg!(windows) && !cfg!(debug_assertions) {
         // release
@@ -48,7 +56,6 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     }
 
     // 1. turn on examples to enable llava
-    config.define("LLAMA_BUILD_COMMON", "ON");
     config.define("LLAMA_BUILD_EXAMPLES", "ON");
 
     // 2. turn off metal and openmp on macOS x86_64
@@ -177,7 +184,7 @@ pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Resu
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let llama_src = Path::new(&manifest_dir).join("llama.cpp");
     let build_info_src = llama_src.join("common/build-info.cpp");
-    let build_info_target = out_dir.join("build").join("build-info.cpp");
+    let build_info_target = out_dir.join("build-info.cpp");
     safe_hard_link(build_info_target, build_info_src)?;
     Ok(())
 }
@@ -201,7 +208,7 @@ fn safe_hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> anyhow::Res
             std::fs::hard_link(src, dst)?;
         }
         (Err(_), _) => {
-            anyhow::bail!("src file not found");
+            anyhow::bail!("src file not found, src: {}, dst: {}", src.display(), dst.display());
         }
     }
     Ok(())
@@ -270,12 +277,12 @@ fn copy_llava_libs(out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
     let build_dir = out_dir.join("build/examples/llava/");
     if cfg!(windows) {
         if build_shared_libs {
-            let src = build_dir.join(format!("Release/{}{}", FILE_STEM_SHARED, ".dll"));
+            let src = build_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
             let dst = lib_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
             safe_hard_link(&src, &dst)
                 .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
         }
-        let src = build_dir.join(format!("Release/{}{}", FILE_STEM_STATIC, ".lib"));
+        let src = build_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
         let dst = lib_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
         safe_hard_link(&src, &dst)
             .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
