@@ -381,9 +381,7 @@ fn main() {
 
     build_mm::pre_cmake_build(&mut config).unwrap();
 
-    let build_dir = config.build();
-    // Install llava libs
-    build_mm::post_cmake_build(&out_dir, build_shared_libs).unwrap();
+    let build_dir = build_mm::cmake_build(&mut config);
 
     let build_info_src = llama_src.join("common/build-info.cpp");
     let build_info_target = build_dir.join("build-info.cpp");
@@ -510,4 +508,7 @@ fn main() {
             }
         }
     }
+
+    // post build
+    build_mm::post_cmake_build(&out_dir, build_shared_libs).unwrap();
 }

@@ -1,4 +1,7 @@
-use std::{env, path::Path};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use cmake::Config;
@@ -11,15 +14,29 @@ macro_rules! debug_log {
     };
 }
 
-/// pre cmake build, called before cmake build
+/// cmake build only once
+/// build.rs:384
 /// ```ignore
 /// let build_dir = config.build();
+/// let build_dir = build_mm::cmake_build(&mut config);
 /// ```
+pub fn cmake_build(config: &mut Config) -> PathBuf {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let build_dir = out_dir.join("build");
+
+    let cmake_cache = build_dir.join("CMakeCache.txt");
+    if cmake_cache.exists() {
+        debug_log!("cmake cache exists, skip cmake build");
+        return build_dir;
+    } else {
+        return config.build();
+    }
+}
+
+/// pre cmake build, called before cmake build
+/// build.rs:382
 pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     let target = env::var("TARGET")?;
-    // let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    // let build_dir = out_dir.join("llama.cpp");
-    // config.out_dir(build_dir);
 
     if cfg!(windows) && !cfg!(debug_assertions) {
         // release
@@ -147,9 +164,7 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// post cmake build, called after cmake build
-/// ```ignore
-/// let build_dir = config.build();
+/// post cmake build, called in the end of `main`
 /// ```
 pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Result<()> {
     if cfg!(windows) && (cfg!(feature = "sycl-f16") || cfg!(feature = "sycl-f32")) {
@@ -157,9 +172,15 @@ pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Resu
     } else {
         copy_llava_libs(out_dir, build_shared_libs)?;
     }
+
+    // cheat build.rs:386
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
+    let llama_src = Path::new(&manifest_dir).join("llama.cpp");
+    let build_info_src = llama_src.join("common/build-info.cpp");
+    let build_info_target = out_dir.join("build").join("build-info.cpp");
+    safe_hard_link(build_info_target, build_info_src)?;
     Ok(())
 }
-
 
 /// check if src file is newer than dst file, if yes, hard link src to dst
 fn safe_hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> anyhow::Result<()> {
