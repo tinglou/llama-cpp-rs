@@ -31,7 +31,7 @@ pub fn cmake_build(config: &mut Config) -> PathBuf {
         // build_dir returned by `cmake::Congfig::build` is the same as oput_dir by default
         out_dir
     } else {
-        let dir =  config.build();
+        let dir = config.build();
         debug_log!("build dir: {}", dir.display());
         dir
     }
@@ -43,7 +43,8 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     let target = env::var("TARGET")?;
 
     if cfg!(windows) {
-        config.generator("Ninja");
+        // Ninja is faster than Makefile/msbuild on Windows
+        // config.generator("Ninja");
     }
 
     if cfg!(windows) && !cfg!(debug_assertions) {
@@ -208,7 +209,11 @@ fn safe_hard_link<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> anyhow::Res
             std::fs::hard_link(src, dst)?;
         }
         (Err(_), _) => {
-            anyhow::bail!("src file not found, src: {}, dst: {}", src.display(), dst.display());
+            anyhow::bail!(
+                "src file not found, src: {}, dst: {}",
+                src.display(),
+                dst.display()
+            );
         }
     }
     Ok(())
@@ -269,46 +274,46 @@ fn copy_sycl_libs(_out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
     Ok(())
 }
 
+fn copy_files_with_pattern(parttenre: &str, out_dir: &Path) -> Result<(), anyhow::Error> {
+    let files = glob::glob(parttenre)?.filter_map(Result::ok);
+    for file in files {
+        let filename = file.file_name().unwrap();
+        let filename = filename.to_str().unwrap();
+        let dst = out_dir.join(filename);
+
+        safe_hard_link(&file, &dst)?;
+    }
+    Ok(())
+}
+
 fn copy_llava_libs(out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow::Error> {
-    const FILE_STEM_SHARED: &str = "llava_shared";
-    const FILE_STEM_STATIC: &str = "llava_static";
+    // llava_static or llava_shared
+    const FILE_STEM: &str = "*llava*";
 
     let lib_dir = out_dir.join("lib");
-    let build_dir = out_dir.join("build/examples/llava/");
+    let build_dir = out_dir.join("build").join("examples").join("llava");
     if cfg!(windows) {
         if build_shared_libs {
-            let src = build_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
-            let dst = lib_dir.join(format!("{}{}", FILE_STEM_SHARED, ".dll"));
-            safe_hard_link(&src, &dst)
-                .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
+            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".dll");
+            copy_files_with_pattern(&pattern, &lib_dir)?;
         }
-        let src = build_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
-        let dst = lib_dir.join(format!("{}{}", FILE_STEM_STATIC, ".lib"));
-        safe_hard_link(&src, &dst)
-            .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
+        let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".lib");
+        copy_files_with_pattern(&pattern, &lib_dir)?;
     } else if cfg!(target_os = "macos") {
         if build_shared_libs {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".dylib"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".dylib"));
-            safe_hard_link(&src, &dst)
-                .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
+            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".dylib");
+            copy_files_with_pattern(&pattern, &lib_dir)?;
         } else {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            safe_hard_link(&src, &dst)
-                .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
+            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".a");
+            copy_files_with_pattern(&pattern, &lib_dir)?;
         }
     } else {
         if build_shared_libs {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".so"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_SHARED, ".so"));
-            safe_hard_link(&src, &dst)
-                .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
+            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".so");
+            copy_files_with_pattern(&pattern, &lib_dir)?;
         } else {
-            let src = build_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            let dst = lib_dir.join(format!("lib{}{}", FILE_STEM_STATIC, ".a"));
-            safe_hard_link(&src, &dst)
-                .with_context(|| format!("Failed to copy lib file {}", src.display()))?;
+            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".a");
+            copy_files_with_pattern(&pattern, &lib_dir)?;
         }
     };
     Ok(())
