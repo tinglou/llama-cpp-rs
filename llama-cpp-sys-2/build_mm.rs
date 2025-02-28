@@ -177,9 +177,8 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
 pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Result<()> {
     if cfg!(windows) && (cfg!(feature = "sycl-f16") || cfg!(feature = "sycl-f32")) {
         copy_sycl_libs(out_dir, build_shared_libs)?;
-    } else {
-        copy_llava_libs(out_dir, build_shared_libs)?;
     }
+    copy_llava_libs(out_dir, build_shared_libs)?;
 
     // cheat build.rs:386
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
@@ -274,15 +273,69 @@ fn copy_sycl_libs(_out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
     Ok(())
 }
 
-fn copy_files_with_pattern(parttenre: &str, out_dir: &Path) -> Result<(), anyhow::Error> {
-    let files = glob::glob(parttenre)?.filter_map(Result::ok);
+fn copy_files_with_pattern(pattern: &str, out_dir: &Path) -> Result<(), anyhow::Error> {
+    let files = glob::glob(pattern)?.filter_map(Result::ok);
+
     for file in files {
         let filename = file.file_name().unwrap();
         let filename = filename.to_str().unwrap();
         let dst = out_dir.join(filename);
-
+        debug_log!("Copy file {}, to {}", file.display(), dst.display());
         safe_hard_link(&file, &dst)?;
     }
+    Ok(())
+}
+
+/// copy specified lib to out_lib
+/// try 1 or 2 level directories. e.g. build_dir/libname.dll or build_dir/Release/libname.dll
+fn copy_libs_with_pattern(
+    build_dir: &PathBuf,
+    libname: &str,
+    build_shared_libs: bool,
+    out_dir: &Path,
+) -> Result<(), anyhow::Error> {
+    debug_log!(
+        "copy lib {libname} in {}, dynamic {build_shared_libs}, to dir {}",
+        build_dir.display(),
+        out_dir.display()
+    );
+    if cfg!(windows) {
+        if build_shared_libs {
+            let pattern = format!("{}/*/{}{}", build_dir.display(), libname, ".dll");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+
+            let pattern = format!("{}/{}{}", build_dir.display(), libname, ".dll");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+        }
+        let pattern = format!("{}/*/{}{}", build_dir.display(), libname, ".lib");
+        copy_files_with_pattern(&pattern, &out_dir)?;
+        let pattern = format!("{}/{}{}", build_dir.display(), libname, ".lib");
+        copy_files_with_pattern(&pattern, &out_dir)?;
+    } else if cfg!(target_os = "macos") {
+        if build_shared_libs {
+            let pattern = format!("{}/*/{}{}", build_dir.display(), libname, ".dylib");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+            let pattern = format!("{}/{}{}", build_dir.display(), libname, ".dylib");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+        } else {
+            let pattern = format!("{}/*/{}{}", build_dir.display(), libname, ".a");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+            let pattern = format!("{}/{}{}", build_dir.display(), libname, ".a");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+        }
+    } else {
+        if build_shared_libs {
+            let pattern = format!("{}/*/{}{}", build_dir.display(), libname, ".so");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+            let pattern = format!("{}/{}{}", build_dir.display(), libname, ".so");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+        } else {
+            let pattern = format!("{}/*/{}{}", build_dir.display(), libname, ".a");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+            let pattern = format!("{}/{}{}", build_dir.display(), libname, ".a");
+            copy_files_with_pattern(&pattern, &out_dir)?;
+        }
+    };
     Ok(())
 }
 
@@ -292,29 +345,8 @@ fn copy_llava_libs(out_dir: &Path, build_shared_libs: bool) -> Result<(), anyhow
 
     let lib_dir = out_dir.join("lib");
     let build_dir = out_dir.join("build").join("examples").join("llava");
-    if cfg!(windows) {
-        if build_shared_libs {
-            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".dll");
-            copy_files_with_pattern(&pattern, &lib_dir)?;
-        }
-        let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".lib");
-        copy_files_with_pattern(&pattern, &lib_dir)?;
-    } else if cfg!(target_os = "macos") {
-        if build_shared_libs {
-            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".dylib");
-            copy_files_with_pattern(&pattern, &lib_dir)?;
-        } else {
-            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".a");
-            copy_files_with_pattern(&pattern, &lib_dir)?;
-        }
-    } else {
-        if build_shared_libs {
-            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".so");
-            copy_files_with_pattern(&pattern, &lib_dir)?;
-        } else {
-            let pattern = format!("{}/*/{}{}", build_dir.display(), FILE_STEM, ".a");
-            copy_files_with_pattern(&pattern, &lib_dir)?;
-        }
-    };
+
+    copy_libs_with_pattern(&build_dir, FILE_STEM, build_shared_libs, &lib_dir)?;
+
     Ok(())
 }
