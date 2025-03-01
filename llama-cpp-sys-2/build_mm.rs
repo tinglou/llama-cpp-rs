@@ -179,13 +179,6 @@ pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Resu
         copy_sycl_libs(out_dir, build_shared_libs)?;
     }
     copy_llava_libs(out_dir, build_shared_libs)?;
-
-    // cheat build.rs:386
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
-    let llama_src = Path::new(&manifest_dir).join("llama.cpp");
-    let build_info_src = llama_src.join("common/build-info.cpp");
-    let build_info_target = out_dir.join("build-info.cpp");
-    safe_hard_link(build_info_target, build_info_src)?;
     Ok(())
 }
 
