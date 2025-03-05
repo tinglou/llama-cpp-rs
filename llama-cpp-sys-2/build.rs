@@ -283,7 +283,11 @@ fn main() {
         config.define("GGML_BLAS", "OFF");
     }
 
-    if (matches!(target_os, TargetOs::Windows(WindowsVariant::Msvc)) && matches!(profile.as_str(), "Release" | "RelWithDebInfo" | "MinSizeRel"))
+    if (matches!(target_os, TargetOs::Windows(WindowsVariant::Msvc))
+        && matches!(
+            profile.as_str(),
+            "Release" | "RelWithDebInfo" | "MinSizeRel"
+        ))
     {
         // Debug Rust builds under MSVC turn off optimization even though we're ideally building the release profile of llama.cpp.
         // Looks like an upstream bug:
@@ -379,11 +383,7 @@ fn main() {
         .very_verbose(std::env::var("CMAKE_VERBOSE").is_ok()) // Not verbose by default
         .always_configure(false);
 
-    build_mm::pre_cmake_build(&mut config).unwrap();
-
     let build_dir = build_mm::cmake_build(&mut config);
-    build_mm::post_cmake_build(&out_dir, build_shared_libs).unwrap();
-
 
     let build_info_src = llama_src.join("common/build-info.cpp");
     let build_info_target = build_dir.join("build-info.cpp");

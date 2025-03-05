@@ -1,3 +1,12 @@
+//! Patch of build.rs
+//! 1. **cmake_build**
+//! ```ignore
+//! let build_dir = config.build();
+//! let build_dir = build_mm::cmake_build(&mut config);
+//! ```
+//! 2. **cheat_build**
+//! called in the end of main
+
 use std::{
     env,
     path::{Path, PathBuf},
@@ -24,22 +33,44 @@ pub fn cmake_build(config: &mut Config) -> PathBuf {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let build_dir = out_dir.join("build");
 
+    // pre cmake build
+    pre_cmake_build(config).unwrap();
+
     //  check if cmake cache exists
     let cmake_cache = build_dir.join("CMakeCache.txt");
-    if cmake_cache.exists() {
+    let build_dir = if cmake_cache.exists() {
         debug_log!("cmake cache exists, skip cmake build");
         // build_dir returned by `cmake::Congfig::build` is the same as oput_dir by default
-        out_dir
+        out_dir.clone()
     } else {
         let dir = config.build();
         debug_log!("build dir: {}", dir.display());
         dir
-    }
+    };
+
+    // post cmake build
+    let build_shared_libs = cfg!(feature = "dynamic-link");
+    let build_shared_libs = std::env::var("LLAMA_BUILD_SHARED_LIBS")
+        .map(|v| v == "1")
+        .unwrap_or(build_shared_libs);
+    post_cmake_build(&out_dir, build_shared_libs).unwrap();
+
+    build_dir
+}
+
+/// called in the end of main
+pub fn cheat_build(out_dir: &Path) -> anyhow::Result<()> {
+    // cheat build.rs:386
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
+    let llama_src = Path::new(&manifest_dir).join("llama.cpp");
+    let build_info_src = llama_src.join("common/build-info.cpp");
+    let build_info_target = out_dir.join("build-info.cpp");
+    safe_hard_link(build_info_target, build_info_src)?;
+    Ok(())
 }
 
 /// pre cmake build, called before cmake build
-/// build.rs:382
-pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
+fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     let target = env::var("TARGET")?;
 
     if cfg!(windows) {
@@ -172,26 +203,12 @@ pub fn pre_cmake_build(config: &mut Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// post cmake build, called in the end of `main`
-/// build.rs:382
-pub fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Result<()> {
+/// post cmake build
+fn post_cmake_build(out_dir: &Path, build_shared_libs: bool) -> anyhow::Result<()> {
     if cfg!(windows) && (cfg!(feature = "sycl-f16") || cfg!(feature = "sycl-f32")) {
         copy_sycl_libs(out_dir, build_shared_libs)?;
     }
     copy_llava_libs(out_dir, build_shared_libs)?;
-    Ok(())
-}
-
-/// post cmake build, called in the end of `main`
-/// ```
-pub fn cheat_build(out_dir: &Path) -> anyhow::Result<()> {
-
-    // cheat build.rs:386
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
-    let llama_src = Path::new(&manifest_dir).join("llama.cpp");
-    let build_info_src = llama_src.join("common/build-info.cpp");
-    let build_info_target = out_dir.join("build-info.cpp");
-    safe_hard_link(build_info_target, build_info_src)?;
     Ok(())
 }
 
