@@ -1,11 +1,9 @@
 //! Patch of build.rs
 //! 1. **cmake_build**
 //! ```ignore
-//! let build_dir = config.build();
-//! let build_dir = build_mm::cmake_build(&mut config);
+//! let build_dir = config.build(); // remove this line
+//! let build_dir = build_mm::cmake_build(&mut config).unwrap();
 //! ```
-//! 2. **cheat_build**
-//! called in the end of main
 
 use std::{
     env,
@@ -15,6 +13,7 @@ use std::{
 use anyhow::Context;
 use cmake::Config;
 
+// use crate::debug_log;
 macro_rules! debug_log {
     ($($arg:tt)*) => {
         if std::env::var("BUILD_DEBUG").is_ok() {
@@ -26,19 +25,22 @@ macro_rules! debug_log {
 /// cmake build only once
 /// build.rs:384
 /// ```ignore
-/// let build_dir = config.build();
-/// let build_dir = build_mm::cmake_build(&mut config);
+/// let build_dir = config.build(); // remove this line
+/// let build_dir = build_mm::cmake_build(&mut config).unwrap();
 /// ```
-pub fn cmake_build(config: &mut Config) -> PathBuf {
+pub fn cmake_build(config: &mut Config) -> anyhow::Result<PathBuf> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let build_dir = out_dir.join("build");
 
     // pre cmake build
-    pre_cmake_build(config).unwrap();
+    pre_cmake_build(config)?;
 
     //  check if cmake cache exists
     let cmake_cache = build_dir.join("CMakeCache.txt");
     let build_dir = if cmake_cache.exists() {
+        // cheat build.rs:386, which will move build-info.cpp to out_dir
+        cheat_build(&out_dir)?;
+
         debug_log!("cmake cache exists, skip cmake build");
         // build_dir returned by `cmake::Congfig::build` is the same as oput_dir by default
         out_dir.clone()
@@ -53,19 +55,21 @@ pub fn cmake_build(config: &mut Config) -> PathBuf {
     let build_shared_libs = std::env::var("LLAMA_BUILD_SHARED_LIBS")
         .map(|v| v == "1")
         .unwrap_or(build_shared_libs);
-    post_cmake_build(&out_dir, build_shared_libs).unwrap();
+    post_cmake_build(&out_dir, build_shared_libs)?;
 
-    build_dir
+    Ok(build_dir)
 }
 
 /// called in the end of main
-pub fn cheat_build(out_dir: &Path) -> anyhow::Result<()> {
+fn cheat_build(out_dir: &Path) -> anyhow::Result<()> {
     // cheat build.rs:386
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let llama_src = Path::new(&manifest_dir).join("llama.cpp");
     let build_info_src = llama_src.join("common/build-info.cpp");
     let build_info_target = out_dir.join("build-info.cpp");
-    safe_hard_link(build_info_target, build_info_src)?;
+    if build_info_target.exists() {
+        safe_hard_link(build_info_target, build_info_src)?;
+    }
     Ok(())
 }
 

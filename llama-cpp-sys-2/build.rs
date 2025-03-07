@@ -383,7 +383,7 @@ fn main() {
         .very_verbose(std::env::var("CMAKE_VERBOSE").is_ok()) // Not verbose by default
         .always_configure(false);
 
-    let build_dir = build_mm::cmake_build(&mut config);
+    let build_dir = build_mm::cmake_build(&mut config).unwrap();
 
     let build_info_src = llama_src.join("common/build-info.cpp");
     let build_info_target = build_dir.join("build-info.cpp");
@@ -511,6 +511,4 @@ fn main() {
         }
     }
 
-    // post build
-    build_mm::cheat_build(&out_dir).unwrap();
 }
