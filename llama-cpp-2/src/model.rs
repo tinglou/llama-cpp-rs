@@ -280,15 +280,17 @@ impl LlamaModel {
         let tokens_estimation = std::cmp::max(8, (str.len() / 2) + usize::from(add_bos));
         let mut buffer: Vec<LlamaToken> = Vec::with_capacity(tokens_estimation);
 
-        let c_string = CString::new(str)?;
+        let bytes: &[u8] = str.as_bytes();
+        let c_text = bytes.as_ptr().cast::<c_char>();
+        let c_text_len = c_int::try_from(bytes.len())?;
         let buffer_capacity =
             c_int::try_from(buffer.capacity()).expect("buffer capacity should fit into a c_int");
 
         let size = unsafe {
             llama_cpp_sys_2::llama_tokenize(
                 self.vocab_ptr(),
-                c_string.as_ptr(),
-                c_int::try_from(c_string.as_bytes().len())?,
+                c_text,
+                c_text_len,
                 buffer.as_mut_ptr().cast::<llama_cpp_sys_2::llama_token>(),
                 buffer_capacity,
                 add_bos,
@@ -303,8 +305,8 @@ impl LlamaModel {
             unsafe {
                 llama_cpp_sys_2::llama_tokenize(
                     self.vocab_ptr(),
-                    c_string.as_ptr(),
-                    c_int::try_from(c_string.as_bytes().len())?,
+                    c_text,
+                    c_text_len,
                     buffer.as_mut_ptr().cast::<llama_cpp_sys_2::llama_token>(),
                     -size,
                     add_bos,
@@ -488,7 +490,8 @@ impl LlamaModel {
     pub fn n_head_kv(&self) -> u32 {
         // It's never possible for this to panic because while the API interface is defined as an int32_t,
         // the field it's accessing is a uint32_t.
-        u32::try_from(unsafe { llama_cpp_sys_2::llama_model_n_head_kv(self.model.as_ptr()) }).unwrap()
+        u32::try_from(unsafe { llama_cpp_sys_2::llama_model_n_head_kv(self.model.as_ptr()) })
+            .unwrap()
     }
 
     /// Returns the rope type of the model.
